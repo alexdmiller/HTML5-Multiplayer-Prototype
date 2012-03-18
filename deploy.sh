@@ -1,1 +1,1 @@
-node web.js
+node web/run.js
