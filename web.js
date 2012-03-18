@@ -2,11 +2,13 @@ var app = require('http').createServer(handler);
 var io = require('socket.io').listen(app);
 var fs = require('fs');
 
-app.listen(8000);
+process.port = process.env.PORT || 3000;
+app.listen(process.port);
+console.log("Listening on port " + process.port);
 
 function handler(req, res) {
   console.log(__dirname);
-  fs.readFile(__dirname + 'index.html',
+  fs.readFile(__dirname + '/web/index.html',
   function (err, data) {
     if (err) {
       res.writeHead(500);
