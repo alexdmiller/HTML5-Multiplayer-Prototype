@@ -10,7 +10,7 @@ else
     if [ -f web.pid ]; then
         kill -INT `cat web.pid`
     fi
-    node web/run.js >> log.txt & 
+    node server/server.js >> log.txt & 
     echo $! > web.pid
     echo "Started."
 fi
