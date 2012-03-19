@@ -10,7 +10,7 @@ else
     if [ -f web.pid ]; then
         kill -INT `cat web.pid`
     fi
-    NODE_ENV=production node app.js >> log.txt & 
+    NODE_ENV=production node app.js & 
     echo $! > web.pid
     echo "Started."
 fi
