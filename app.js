@@ -5,7 +5,8 @@
 
 var express = require('express');
 var app = module.exports = express.createServer();
-var sio = require('socket.io'); 
+var sio = require('socket.io');
+var tg = require('./game/tg-server.js');
 
 // Configuration
 
@@ -15,8 +16,7 @@ app.configure(function(){
   app.use(express.bodyParser());
   app.use(express.methodOverride());
   app.use(app.router);
-  app.use(express.static(__dirname + '/game/client'));
-  io = sio.listen(app);
+  app.use(express.static(__dirname + '/game/js/client'));
 });
 
 app.configure('development', function(){
@@ -34,8 +34,13 @@ app.configure('production', function(){
 // Routes
 
 app.get('/', function(req, res) {
-  res.render('index', { title: 'Express', ip: app.set('ip') })
+  res.render('index', { title: 'Express', ip: app.set('ip'), port: app.set('port') })
 });
 
 app.listen(app.set('port'));
+
+// Set up game server
+io = sio.listen(app);
+game = tg.createServer(io, app.set('ip'), app.set('port'));
+
 console.log("Express server listening on port %d in %s mode", app.address().port, app.settings.env);
