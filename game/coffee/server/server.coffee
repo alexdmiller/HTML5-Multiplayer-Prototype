@@ -24,24 +24,37 @@ class WaitingRoomServer
 class GameServer
   constructor: ->
     @game = new Game
+    @players = []
     @game.map =
-      xSize: 3
-      ySize: 3
+      xSize: 10
+      ySize: 10
       tiles: [
-        1, 0, 1
-        0, 0, 0
-        1, 1, 1
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+        1, 0, 0, 0, 0, 0, 0, 0, 0, 1
+        1, 0, 0, 0, 0, 0, 0, 0, 0, 1
+        1, 0, 0, 1, 1, 0, 0, 0, 0, 1
+        1, 0, 0, 0, 1, 0, 0, 0, 0, 1
+        1, 0, 0, 0, 1, 0, 0, 0, 0, 1
+        1, 0, 0, 0, 1, 0, 1, 0, 0, 1
+        1, 0, 0, 0, 0, 0, 1, 0, 0, 1
+        1, 0, 0, 0, 0, 0, 0, 0, 0, 1
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1
       ]
   
   addPlayer: (player) ->
+    # add a tank to the game
+    tank = @game.createTank(player.name)
+    player.setTank tank
     console.log "Adding '#{player.name}' to game and sending map data."
-    @game.addPlayer(player)
-    console.log "There are #{@game.players.length} players in the game."
+    @players.push player
+    console.log "There are #{@players.length} players in the game."
     player.socket.emit 'map_data', @game.map
+    player.socket.emit 'tank_data', @game.tanks
   
   removePlayer: (player) ->
-    console.log "Removed '#{player.name}' from game."
-    @game.removePlayer(player)
+    # TODO: remove player's tank from game
+    console.log "Removed '#{player.name}' from server."
+    @players.splice @players.indexOf player, 1
 
 class Player
   constructor: (@socket, joinServer, joinGame) ->
@@ -52,3 +65,6 @@ class Player
       joinServer this
     @socket.on 'join_game', =>
       joinGame this
+
+  setTank: (@tank) ->
+    

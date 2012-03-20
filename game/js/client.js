@@ -1,6 +1,13 @@
 (function() {
-  var Game, GameClient, GameObjectModel, GameView, Signal, Vector, connectionURL;
-  var __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
+  var Game, GameClient, GameObject, GameView, Signal, Tank, Vector, connectionURL;
+  var __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; }, __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
+    for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
+    function ctor() { this.constructor = child; }
+    ctor.prototype = parent.prototype;
+    child.prototype = new ctor;
+    child.__super__ = parent.prototype;
+    return child;
+  };
   connectionURL = "http://" + TankGame.IP + ":" + TankGame.PORT;
   GameClient = (function() {
     function GameClient(canvas) {
@@ -32,9 +39,13 @@
       this.game = new Game;
       this.view = new GameView(this.canvas, this.game);
       this.socket.emit('join_game');
-      return this.socket.on('map_data', __bind(function(map) {
-        console.log("Loading map.");
+      this.socket.on('map_data', __bind(function(map) {
+        console.log("Received map data.");
         return this.game.loadMap(map);
+      }, this));
+      return this.socket.on('tank_data', __bind(function(tanks) {
+        console.log("Received tank data.");
+        return this.game.loadTanks(tanks);
       }, this));
     };
     return GameClient;
@@ -43,10 +54,17 @@
     function GameView(canvas, game) {
       this.canvas = canvas;
       this.game = game;
+      this.drawTanks = __bind(this.drawTanks, this);
       this.drawMap = __bind(this.drawMap, this);
+      this.render = __bind(this.render, this);
       this.ctx = this.canvas[0].getContext("2d");
-      this.game.mapLoaded.add(this.drawMap);
+      this.game.mapLoaded.add(this.render);
+      this.game.tanksLoaded.add(this.render);
     }
+    GameView.prototype.render = function() {
+      this.drawMap(this.game.map);
+      return this.drawTanks(this.game.tanks);
+    };
     GameView.prototype.drawMap = function(map) {
       var i, j, tileType, x, y, _ref, _results;
       $(this.canvas).attr('width', this.game.tileSize * map.xSize + "px");
@@ -60,10 +78,21 @@
             y = this.game.tileSize * i;
             x = this.game.tileSize * j;
             tileType = map.tiles[i * map.xSize + j];
-            _results2.push(tileType === 1 ? (this.ctx.fillStyle = "0x000000", console.log(x, y, this.game.tileSize, this.game.tileSize), this.ctx.fillRect(x, y, this.game.tileSize, this.game.tileSize)) : void 0);
+            _results2.push(tileType === 1 ? (this.ctx.fillStyle = "#000000", this.ctx.fillRect(x, y, this.game.tileSize, this.game.tileSize)) : void 0);
           }
           return _results2;
         }).call(this));
+      }
+      return _results;
+    };
+    GameView.prototype.drawTanks = function(tanks) {
+      var tank, _i, _len, _results;
+      _results = [];
+      for (_i = 0, _len = tanks.length; _i < _len; _i++) {
+        tank = tanks[_i];
+        this.ctx.fillStyle = "#FF0000";
+        this.ctx.fillRect(tank.position.x, tank.position.y, 15, 15);
+        _results.push(this.ctx.fillText(tank.name, tank.position.x, tank.position.y + 25));
       }
       return _results;
     };
@@ -127,34 +156,72 @@
   })();
   Game = (function() {
     function Game() {
-      this.tileSize = 20;
-      this.players = [];
-      this.xSize = 0;
-      this.ySize = 0;
-      this.map = [];
+      this.createTank = __bind(this.createTank, this);
+      this.mapHeight = __bind(this.mapHeight, this);
+      this.mapWidth = __bind(this.mapWidth, this);      this.tileSize = 40;
+      this.tanks = [];
+      this.map = {};
       this.mapLoaded = new Signal;
+      this.tanksLoaded = new Signal;
     }
+    Game.prototype.mapWidth = function() {
+      return this.map.xSize * this.tileSize;
+    };
+    Game.prototype.mapHeight = function() {
+      return this.map.ySize * this.tileSize;
+    };
     Game.prototype.loadMap = function(map) {
       this.map = map;
       return this.mapLoaded.dispatch(this.map);
     };
-    Game.prototype.addPlayer = function(player) {
-      return this.players.push(player);
+    Game.prototype.loadTanks = function(tanks) {
+      var tankData, _i, _len;
+      this.tanks = [];
+      for (_i = 0, _len = tanks.length; _i < _len; _i++) {
+        tankData = tanks[_i];
+        this.tanks.push(new Tank(tankData));
+      }
+      return this.tanksLoaded.dispatch(this.tanks);
     };
-    Game.prototype.removePlayer = function(player) {
-      return this.players.splice(this.players.indexOf(player, 1));
+    Game.prototype.addTank = function(tank) {
+      return this.tanks.push(tank);
+    };
+    Game.prototype.createTank = function(name) {
+      var tank;
+      tank = new Tank;
+      tank.name = name;
+      tank.position.set(Math.random() * this.mapWidth(), Math.random() * this.mapHeight());
+      this.tanks.push(tank);
+      return tank;
     };
     return Game;
   })();
-  GameObjectModel = (function() {
-    function GameObjectModel() {
-      this.position = new Vector(0, 0);
-      this.velocity = new Vector(0, 0);
+  GameObject = (function() {
+    function GameObject(data) {
+      if (data) {
+        this.position = data.position;
+        this.velocity = data.velocity;
+      } else {
+        this.position = new Vector(0, 0);
+        this.velocity = new Vector(0, 0);
+      }
     }
-    GameObjectModel.prototype.update = function() {};
-    GameObjectModel.prototype.print = function() {
+    GameObject.prototype.update = function() {
+      return this.position.add(this.velocity);
+    };
+    GameObject.prototype.print = function() {
       return console.log("" + this.position.x + ", " + this.position.y);
     };
-    return GameObjectModel;
+    return GameObject;
+  })();
+  Tank = (function() {
+    __extends(Tank, GameObject);
+    function Tank(data) {
+      if (data) {
+        this.name = data.name;
+      }
+      Tank.__super__.constructor.call(this, data);
+    }
+    return Tank;
   })();
 }).call(this);

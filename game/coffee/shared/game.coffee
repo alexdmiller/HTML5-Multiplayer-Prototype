@@ -1,18 +1,33 @@
 class Game
   constructor: ->
-    @tileSize = 20
-    @players = []
-    @xSize = 0
-    @ySize = 0
-    @map = []
+    @tileSize = 40
+    @tanks = []
+    @map = {}
     @mapLoaded = new Signal
+    @tanksLoaded = new Signal
   
+  mapWidth: =>
+    return @map.xSize * @tileSize
+
+  mapHeight: =>
+    return @map.ySize * @tileSize
+
   loadMap: (map) ->
     @map = map
     @mapLoaded.dispatch @map
     
-  addPlayer: (player) ->     
-    @players.push(player)
-
-  removePlayer: (player) ->        
-    @players.splice @players.indexOf player, 1
+  loadTanks: (tanks) ->
+    @tanks = []
+    for tankData in tanks
+      @tanks.push new Tank tankData
+    @tanksLoaded.dispatch @tanks
+    
+  addTank: (tank) ->
+    @tanks.push(tank)
+    
+  createTank: (name) =>
+    tank = new Tank
+    tank.name = name
+    tank.position.set Math.random() * @mapWidth(), Math.random() * @mapHeight()
+    @tanks.push tank
+    return tank

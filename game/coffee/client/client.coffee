@@ -27,14 +27,22 @@ class GameClient
     @view = new GameView @canvas, @game
     @socket.emit 'join_game'  
     @socket.on 'map_data', (map) =>
-      console.log "Loading map."
+      console.log "Received map data."
       @game.loadMap map
+    @socket.on 'tank_data', (tanks) =>
+      console.log "Received tank data."
+      @game.loadTanks tanks
     
 class GameView
   constructor: (@canvas, @game) ->
     @ctx = @canvas[0].getContext "2d"
-    @game.mapLoaded.add @drawMap
+    @game.mapLoaded.add @render
+    @game.tanksLoaded.add @render
   
+  render: =>
+    @drawMap(@game.map)
+    @drawTanks(@game.tanks)
+
   drawMap: (map) =>
     $(@canvas).attr 'width', @game.tileSize * map.xSize + "px"
     $(@canvas).attr 'height', @game.tileSize * map.ySize + "px"
@@ -44,10 +52,15 @@ class GameView
         x = @game.tileSize * j
         tileType = map.tiles[i * map.xSize + j]
         if tileType is 1
-          @ctx.fillStyle = "0x000000"
+          @ctx.fillStyle = "#000000"
           @ctx.fillRect x, y, @game.tileSize, @game.tileSize
-        else
 
+  drawTanks: (tanks) =>
+    for tank in tanks
+      @ctx.fillStyle = "#FF0000"
+      @ctx.fillRect tank.position.x, tank.position.y, 15, 15
+      @ctx.fillText tank.name, tank.position.x, tank.position.y + 25
+      
 $(document).ready ->  
   client = new GameClient $("#game_canvas")
   $("#connect").click ->
