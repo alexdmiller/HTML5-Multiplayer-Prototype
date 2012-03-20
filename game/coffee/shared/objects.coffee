@@ -7,4 +7,3 @@ class GameObjectModel
     
   print: ->
     console.log "#{@position.x}, #{@position.y}"
-    

@@ -1,47 +1,54 @@
 exports.createServer = (io, ip, port) -> 
   console.log "Creating game server..."
-  new GameServer(io)
+  new WaitingRoomServer(io)
 
-class GameServer
+class WaitingRoomServer
   constructor: (@io) ->
-    @theGame = new Game
+    @theGame = new GameServer
     @waitingPlayers = []
-    @io.sockets.on 'connection', @newPlayer
-    
-  newPlayer: (socket) =>
-    player = new Player socket, this
-    @waitingPlayers.push(player)
-    console.log "Added player. There are now #{@waitingPlayers.length} waiting for a game."
-  
+    @io.sockets.on 'connection', (socket) =>
+      player = new Player socket, @joinServer, @joinGame
+
   removePlayer: (player) =>
     @waitingPlayers.splice @waitingPlayers.indexOf player, 1
-    console.log "Removed player. There are now #{@waitingPlayers.length} waiting for a game."
+    console.log "Removed '#{player.name}' from waiting room. (#{@waitingPlayers.length})"
   
-  joinGame: (player) ->
+  joinServer: (player) =>
+    @waitingPlayers.push(player)
+    console.log "Added '#{player.name}' to waiting room. (#{@waitingPlayers.length})"
+  
+  joinGame: (player) =>
     @removePlayer player
     @theGame.addPlayer player
 
-class Player
-  constructor: (@socket, @server) ->
-    @score = 0
-    @socket.on 'set_name', @setName
-    @socket.on 'join_game', @joinGame
-  
-  setName: (@name) =>
-    @socket.emit 'name_set'
-    
-  joinGame: =>
-    @server.joinGame this
-
-class Game
+class GameServer
   constructor: ->
-    @players = []
-    @map = []
+    @game = new Game
+    @game.map =
+      xSize: 3
+      ySize: 3
+      tiles: [
+        1, 0, 1
+        0, 0, 0
+        1, 1, 1
+      ]
   
-  addPlayer: (player) ->     
-    @players.push(player)
-    player.socket.emit 'map_data', {map: @map}
-    console.log "#{player.name} joined game."   
+  addPlayer: (player) ->
+    console.log "Adding '#{player.name}' to game and sending map data."
+    @game.addPlayer(player)
+    console.log "There are #{@game.players.length} players in the game."
+    player.socket.emit 'map_data', @game.map
+  
+  removePlayer: (player) ->
+    console.log "Removed '#{player.name}' from game."
+    @game.removePlayer(player)
 
-  removePlayer: (player) ->        
-    @players.splice @players.indexOf player, 1
+class Player
+  constructor: (@socket, joinServer, joinGame) ->
+    @score = 0
+    # before we do anything else, the name must be set
+    @socket.on 'set_name', (@name) =>
+      @socket.emit 'name_set'
+      joinServer this
+    @socket.on 'join_game', =>
+      joinGame this

@@ -1,7 +1,74 @@
 (function() {
-  var Game, GameObjectModel, GameServer, Player, Signal, Vector;
+  var Game, GameObjectModel, GameServer, Player, Signal, Vector, WaitingRoomServer;
   var __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
-  exports.Vector = Vector = (function() {
+  exports.createServer = function(io, ip, port) {
+    console.log("Creating game server...");
+    return new WaitingRoomServer(io);
+  };
+  WaitingRoomServer = (function() {
+    function WaitingRoomServer(io) {
+      this.io = io;
+      this.joinGame = __bind(this.joinGame, this);
+      this.joinServer = __bind(this.joinServer, this);
+      this.removePlayer = __bind(this.removePlayer, this);
+      this.theGame = new GameServer;
+      this.waitingPlayers = [];
+      this.io.sockets.on('connection', __bind(function(socket) {
+        var player;
+        return player = new Player(socket, this.joinServer, this.joinGame);
+      }, this));
+    }
+    WaitingRoomServer.prototype.removePlayer = function(player) {
+      this.waitingPlayers.splice(this.waitingPlayers.indexOf(player, 1));
+      return console.log("Removed '" + player.name + "' from waiting room. (" + this.waitingPlayers.length + ")");
+    };
+    WaitingRoomServer.prototype.joinServer = function(player) {
+      this.waitingPlayers.push(player);
+      return console.log("Added '" + player.name + "' to waiting room. (" + this.waitingPlayers.length + ")");
+    };
+    WaitingRoomServer.prototype.joinGame = function(player) {
+      this.removePlayer(player);
+      return this.theGame.addPlayer(player);
+    };
+    return WaitingRoomServer;
+  })();
+  GameServer = (function() {
+    function GameServer() {
+      this.game = new Game;
+      this.game.map = {
+        xSize: 3,
+        ySize: 3,
+        tiles: [1, 0, 1, 0, 0, 0, 1, 1, 1]
+      };
+    }
+    GameServer.prototype.addPlayer = function(player) {
+      console.log("Adding '" + player.name + "' to game and sending map data.");
+      this.game.addPlayer(player);
+      console.log("There are " + this.game.players.length + " players in the game.");
+      return player.socket.emit('map_data', this.game.map);
+    };
+    GameServer.prototype.removePlayer = function(player) {
+      console.log("Removed '" + player.name + "' from game.");
+      return this.game.removePlayer(player);
+    };
+    return GameServer;
+  })();
+  Player = (function() {
+    function Player(socket, joinServer, joinGame) {
+      this.socket = socket;
+      this.score = 0;
+      this.socket.on('set_name', __bind(function(name) {
+        this.name = name;
+        this.socket.emit('name_set');
+        return joinServer(this);
+      }, this));
+      this.socket.on('join_game', __bind(function() {
+        return joinGame(this);
+      }, this));
+    }
+    return Player;
+  })();
+  Vector = (function() {
     function Vector(x, y) {
       this.x = x;
       this.y = y;
@@ -25,7 +92,7 @@
     };
     return Vector;
   })();
-  exports.Signal = Signal = (function() {
+  Signal = (function() {
     function Signal() {
       this.listeners = [];
     }
@@ -44,65 +111,21 @@
     };
     return Signal;
   })();
-  exports.createServer = function(io, ip, port) {
-    console.log("Creating game server...");
-    return new GameServer(io);
-  };
-  GameServer = (function() {
-    function GameServer(io) {
-      this.io = io;
-      this.removePlayer = __bind(this.removePlayer, this);
-      this.newPlayer = __bind(this.newPlayer, this);
-      this.theGame = new Game;
-      this.waitingPlayers = [];
-      this.io.sockets.on('connection', this.newPlayer);
-    }
-    GameServer.prototype.newPlayer = function(socket) {
-      var player;
-      player = new Player(socket, this);
-      this.waitingPlayers.push(player);
-      return console.log("Added player. There are now " + this.waitingPlayers.length + " waiting for a game.");
-    };
-    GameServer.prototype.removePlayer = function(player) {
-      this.waitingPlayers.splice(this.waitingPlayers.indexOf(player, 1));
-      return console.log("Removed player. There are now " + this.waitingPlayers.length + " waiting for a game.");
-    };
-    GameServer.prototype.joinGame = function(player) {
-      this.removePlayer(player);
-      return this.theGame.addPlayer(player);
-    };
-    return GameServer;
-  })();
-  Player = (function() {
-    function Player(socket, server) {
-      this.socket = socket;
-      this.server = server;
-      this.joinGame = __bind(this.joinGame, this);
-      this.setName = __bind(this.setName, this);
-      this.score = 0;
-      this.socket.on('set_name', this.setName);
-      this.socket.on('join_game', this.joinGame);
-    }
-    Player.prototype.setName = function(name) {
-      this.name = name;
-      return this.socket.emit('name_set');
-    };
-    Player.prototype.joinGame = function() {
-      return this.server.joinGame(this);
-    };
-    return Player;
-  })();
   Game = (function() {
     function Game() {
+      this.tileSize = 20;
       this.players = [];
+      this.xSize = 0;
+      this.ySize = 0;
       this.map = [];
+      this.mapLoaded = new Signal;
     }
+    Game.prototype.loadMap = function(map) {
+      this.map = map;
+      return this.mapLoaded.dispatch(this.map);
+    };
     Game.prototype.addPlayer = function(player) {
-      this.players.push(player);
-      player.socket.emit('map_data', {
-        map: this.map
-      });
-      return console.log("" + player.name + " joined game.");
+      return this.players.push(player);
     };
     Game.prototype.removePlayer = function(player) {
       return this.players.splice(this.players.indexOf(player, 1));

@@ -1,4 +1,4 @@
-exports.Vector = class Vector
+class Vector
     constructor: (@x, @y) ->
 
     set: (x, y) ->
@@ -16,7 +16,7 @@ exports.Vector = class Vector
     copy: ->
         new Vector(@x, @y)
 
-exports.Signal = class Signal
+class Signal
     constructor: ->
         @listeners = []
 
