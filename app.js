@@ -6,7 +6,7 @@
 var express = require('express');
 var app = module.exports = express.createServer();
 var sio = require('socket.io');
-var tg = require('./game/tg-server.js');
+var tg = require('./game/js/server.js');
 
 // Configuration
 
@@ -16,7 +16,7 @@ app.configure(function(){
   app.use(express.bodyParser());
   app.use(express.methodOverride());
   app.use(app.router);
-  app.use(express.static(__dirname + '/game/js/client'));
+  app.use(express.static(__dirname + '/game/js'));
 });
 
 app.configure('development', function(){
