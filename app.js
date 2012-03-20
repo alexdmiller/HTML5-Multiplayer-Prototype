@@ -28,7 +28,7 @@ app.configure('development', function(){
 app.configure('production', function(){
   app.use(express.errorHandler());
   app.set('ip', '173.255.245.211');
-  app.set('port', '80');
+  app.set('port', '3000');
 });
 
 // Routes
