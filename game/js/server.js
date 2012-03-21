@@ -22,7 +22,7 @@
       this.waitingPlayers = [];
       this.io.sockets.on('connection', __bind(function(socket) {
         var player;
-        return player = new Player(socket, this.joinServer, this.joinGame);
+        return player = new Player(socket, this);
       }, this));
     }
     WaitingRoomServer.prototype.removePlayer = function(player) {
@@ -55,6 +55,7 @@
       player.setTank(tank);
       console.log("Adding '" + player.name + "' to game and sending map data.");
       this.players.push(player);
+      player.gameServer = this;
       console.log("There are " + this.players.length + " players in the game.");
       player.socket.emit('map_data', this.game.map);
       return player.socket.emit('tank_data', this.game.tanks);
@@ -63,23 +64,45 @@
       console.log("Removed '" + player.name + "' from server.");
       return this.players.splice(this.players.indexOf(player, 1));
     };
+    GameServer.prototype.sendToPlayers = function(type, data) {
+      var player, _i, _len, _ref, _results;
+      _ref = this.players;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        player = _ref[_i];
+        _results.push(player.socket.emit(type, data));
+      }
+      return _results;
+    };
     return GameServer;
   })();
   Player = (function() {
-    function Player(socket, joinServer, joinGame) {
+    function Player(socket, server) {
       this.socket = socket;
+      this.server = server;
+      this.newWaypoint = __bind(this.newWaypoint, this);
       this.score = 0;
       this.socket.on('set_name', __bind(function(name) {
         this.name = name;
         this.socket.emit('name_set');
-        return joinServer(this);
+        return this.server.joinServer(this);
       }, this));
       this.socket.on('join_game', __bind(function() {
-        return joinGame(this);
+        return this.server.joinGame(this);
       }, this));
+      this.socket.on('new_waypoint', this.newWaypoint);
     }
     Player.prototype.setTank = function(tank) {
       this.tank = tank;
+    };
+    Player.prototype.newWaypoint = function(data) {
+      var p;
+      p = new Vector(data.x, data.y);
+      this.tank.addWaypoint(p);
+      return this.gameServer.sendToPlayers('new_waypoint', {
+        name: this.tank.name,
+        waypoint: p
+      });
     };
     return Player;
   })();
@@ -128,6 +151,8 @@
   })();
   Game = (function() {
     function Game() {
+      this.tick = __bind(this.tick, this);
+      this.findTankByName = __bind(this.findTankByName, this);
       this.createTank = __bind(this.createTank, this);
       this.mapHeight = __bind(this.mapHeight, this);
       this.mapWidth = __bind(this.mapWidth, this);      this.tileSize = 40;
@@ -135,6 +160,7 @@
       this.map = {};
       this.mapLoaded = new Signal;
       this.tanksLoaded = new Signal;
+      this.gameUpdated = new Signal;
     }
     Game.prototype.mapWidth = function() {
       return this.map.xSize * this.tileSize;
@@ -166,13 +192,38 @@
       this.tanks.push(tank);
       return tank;
     };
+    Game.prototype.findTankByName = function(name) {
+      var t, tank;
+      tank = ((function() {
+        var _i, _len, _ref, _results;
+        _ref = this.tanks;
+        _results = [];
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          t = _ref[_i];
+          if (t.name === name) {
+            _results.push(t);
+          }
+        }
+        return _results;
+      }).call(this))[0];
+      return tank;
+    };
+    Game.prototype.tick = function() {
+      var tank, _i, _len, _ref;
+      _ref = this.tanks;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        tank = _ref[_i];
+        tank.update();
+      }
+      return this.gameUpdated.dispatch();
+    };
     return Game;
   })();
   GameObject = (function() {
     function GameObject(data) {
       if (data) {
-        this.position = data.position;
-        this.velocity = data.velocity;
+        this.position = new Vector(data.position.x, data.position.y);
+        this.velocity = new Vector(data.velocity.y, data.velocity.y);
       } else {
         this.position = new Vector(0, 0);
         this.velocity = new Vector(0, 0);
@@ -189,11 +240,47 @@
   Tank = (function() {
     __extends(Tank, GameObject);
     function Tank(data) {
-      if (data) {
+      this.addWaypoint = __bind(this.addWaypoint, this);
+      this.seekNextWaypoint = __bind(this.seekNextWaypoint, this);
+      this.update = __bind(this.update, this);      if (data) {
         this.name = data.name;
       }
+      this.waypoints = [];
+      this.speed = 2;
       Tank.__super__.constructor.call(this, data);
     }
+    Tank.prototype.update = function() {
+      var dist, dx, dy;
+      if (this.currentWaypoint) {
+        dx = this.position.x - this.currentWaypoint.x;
+        dy = this.position.y - this.currentWaypoint.y;
+        dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 1) {
+          this.velocity.x = 0;
+          this.velocity.y = 0;
+          this.currentWaypoint = null;
+          if (this.waypoints.length > 0) {
+            this.seekNextWaypoint();
+          }
+        }
+      }
+      return Tank.__super__.update.call(this);
+    };
+    Tank.prototype.seekNextWaypoint = function() {
+      var angle, dx, dy;
+      this.currentWaypoint = this.waypoints.shift();
+      dx = this.currentWaypoint.x - this.position.x;
+      dy = this.currentWaypoint.y - this.position.y;
+      angle = Math.atan2(dy, dx);
+      this.velocity.x = Math.cos(angle) * this.speed;
+      return this.velocity.y = Math.sin(angle) * this.speed;
+    };
+    Tank.prototype.addWaypoint = function(p) {
+      this.waypoints.push(p);
+      if (!this.currentWaypoint) {
+        return this.seekNextWaypoint();
+      }
+    };
     return Tank;
   })();
 }).call(this);

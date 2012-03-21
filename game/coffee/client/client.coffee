@@ -16,7 +16,7 @@ class GameClient
     @socket.on 'disconnect', =>
       console.log "Disconnecting from server."
       @disconnect()
-    
+
   disconnect: ->
     console.log "Disconnecting client."
     @socket.disconnect()
@@ -25,6 +25,7 @@ class GameClient
     console.log "Joining game."
     @game = new Game
     @view = new GameView @canvas, @game
+    @controller = new GameController this
     @socket.emit 'join_game'  
     @socket.on 'map_data', (map) =>
       console.log "Received map data."
@@ -32,14 +33,47 @@ class GameClient
     @socket.on 'tank_data', (tanks) =>
       console.log "Received tank data."
       @game.loadTanks tanks
-    
+    @socket.on 'new_waypoint', @receiveWaypoint
+  
+  sendWaypoint: (x, y) =>
+    console.log "Sending waypoint " + x + " " + y
+    @socket.emit 'new_waypoint', {x: x, y: y}
+  
+  receiveWaypoint: (data) =>
+    console.log "Received waypoint for " + data.name
+    tank = @game.findTankByName(data.name)
+    tank.addWaypoint(data.waypoint)
+
+class GameController
+  constructor: (@client) ->
+    $(@client.canvas).click @onClick
+    setInterval @onTick, 1000 / 60
+  
+  onTick: (event) =>
+    @client.game.tick()
+  
+  onClick: (e) =>
+    x = 0
+    y = 0
+    if e.pageX or e.pageY 
+      x = e.pageX
+      y = e.pageY
+    else
+      x = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft
+      y = e.clientY + document.body.scrollTop + document.documentElement.scrollTop
+    x -= @client.canvas[0].offsetLeft
+    y -= @client.canvas[0].offsetTop
+    @client.sendWaypoint x, y
+
 class GameView
   constructor: (@canvas, @game) ->
     @ctx = @canvas[0].getContext "2d"
     @game.mapLoaded.add @render
     @game.tanksLoaded.add @render
+    @game.gameUpdated.add @render
   
   render: =>
+    $(@canvas).attr 'width', $(@canvas).attr 'width'
     @drawMap(@game.map)
     @drawTanks(@game.tanks)
 
@@ -70,4 +104,3 @@ $(document).ready ->
     else
       client.disconnect()
       location.reload();
-    

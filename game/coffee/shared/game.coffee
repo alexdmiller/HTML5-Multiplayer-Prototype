@@ -5,6 +5,7 @@ class Game
     @map = {}
     @mapLoaded = new Signal
     @tanksLoaded = new Signal
+    @gameUpdated = new Signal
   
   mapWidth: =>
     return @map.xSize * @tileSize
@@ -31,3 +32,11 @@ class Game
     tank.position.set Math.random() * @mapWidth(), Math.random() * @mapHeight()
     @tanks.push tank
     return tank
+  
+  findTankByName: (name) =>
+    tank = (t for t in @tanks when t.name == name)[0]
+    return tank
+  
+  tick: =>
+    tank.update() for tank in @tanks
+    @gameUpdated.dispatch()
