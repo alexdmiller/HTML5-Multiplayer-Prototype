@@ -1,3 +1,6 @@
+var PRODUCTION_IP = '173.255.245.211';
+var PORT = 3000;
+
 
 /**
  * Module dependencies.
@@ -22,12 +25,12 @@ app.configure(function(){
 app.configure('development', function(){
   app.use(express.errorHandler({ dumpExceptions: true, showStack: true }));
   app.set('ip', 'localhost');
-  app.set('port', '3000');
+  app.set('port', PORT);
 });
 
 app.configure('production', function(){
   app.use(express.errorHandler());
-  app.set('ip', '173.255.245.211');
+  app.set('ip', PRODUCTION_IP);
   app.set('port', '3000');
 });
 
