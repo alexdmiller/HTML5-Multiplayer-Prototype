@@ -1,6 +1,6 @@
 class Game
   constructor: ->
-    @tileSize = 40
+    @tileSize = 30
     @tanks = []
     @map = {}
     @mapLoaded = new Signal

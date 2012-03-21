@@ -1,5 +1,5 @@
 (function() {
-  var Game, GameClient, GameController, GameObject, GameView, Signal, Tank, Vector, connectionURL;
+  var Game, GameObject, GameServer, Player, Signal, Tank, Vector, WaitingRoomServer;
   var __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; }, __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
     for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
     function ctor() { this.constructor = child; }
@@ -8,159 +8,117 @@
     child.__super__ = parent.prototype;
     return child;
   };
-  connectionURL = "http://" + TankGame.IP + ":" + TankGame.PORT;
-  GameClient = (function() {
-    function GameClient(canvas) {
-      this.canvas = canvas;
-      this.receiveWaypoint = __bind(this.receiveWaypoint, this);
-      this.sendWaypoint = __bind(this.sendWaypoint, this);
+  exports.createServer = function(io, ip, port) {
+    console.log("Creating game server...");
+    return new WaitingRoomServer(io);
+  };
+  WaitingRoomServer = (function() {
+    function WaitingRoomServer(io) {
+      this.io = io;
       this.joinGame = __bind(this.joinGame, this);
-      console.log("Game client created.");
+      this.joinServer = __bind(this.joinServer, this);
+      this.removePlayer = __bind(this.removePlayer, this);
+      this.theGame = new GameServer;
+      this.waitingPlayers = [];
+      this.io.sockets.on('connection', __bind(function(socket) {
+        var player;
+        return player = new Player(socket, this);
+      }, this));
     }
-    GameClient.prototype.connect = function(name) {
-      this.name = name;
-      console.log("Connecting to server with name '" + this.name + "'.");
-      this.socket = io.connect(connectionURL);
-      console.log("Attempting handshake with server.");
-      this.socket.on('connect', __bind(function() {
-        console.log("Sending name.");
-        this.socket.emit('set_name', this.name);
-        return this.socket.on('name_set', this.joinGame);
-      }, this));
-      return this.socket.on('disconnect', __bind(function() {
-        console.log("Disconnecting from server.");
-        return this.disconnect();
-      }, this));
+    WaitingRoomServer.prototype.removePlayer = function(player) {
+      this.waitingPlayers.splice(this.waitingPlayers.indexOf(player, 1));
+      return console.log("Removed '" + player.name + "' from waiting room. (" + this.waitingPlayers.length + ")");
     };
-    GameClient.prototype.disconnect = function() {
-      console.log("Disconnecting client.");
-      return this.socket.disconnect();
+    WaitingRoomServer.prototype.joinServer = function(player) {
+      this.waitingPlayers.push(player);
+      return console.log("Added '" + player.name + "' to waiting room. (" + this.waitingPlayers.length + ")");
     };
-    GameClient.prototype.joinGame = function() {
-      console.log("Joining game.");
+    WaitingRoomServer.prototype.joinGame = function(player) {
+      this.removePlayer(player);
+      return this.theGame.addPlayer(player);
+    };
+    return WaitingRoomServer;
+  })();
+  GameServer = (function() {
+    function GameServer() {
       this.game = new Game;
-      this.view = new GameView(this.canvas, this.game);
-      this.controller = new GameController(this);
-      this.socket.emit('join_game');
-      this.socket.on('map_data', __bind(function(map) {
-        console.log("Received map data.");
-        return this.game.loadMap(map);
-      }, this));
-      this.socket.on('tank_data', __bind(function(tanks) {
-        console.log("Received tank data.");
-        return this.game.loadTanks(tanks);
-      }, this));
-      this.socket.on('add_tank', __bind(function(data) {
-        return this.game.addTank(new Tank(data));
-      }, this));
-      return this.socket.on('new_waypoint', this.receiveWaypoint);
+      this.players = [];
+      this.game.map = {
+        xSize: 20,
+        ySize: 20,
+        tiles: [1, 1, 6, 1, 1, 1, 0, 0, 1, 1, 1, 6, 6, 6, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0, 0, 1, 1, 1, 1, 1, 5, 5, 5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 2, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 6, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 6, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 1, 1, 1, 5, 1, 1, 0, 0, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 1, 1, 1, 5, 1, 1, 0, 0, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 1, 1, 1, 5, 1, 1, 0, 0, 1, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 7, 7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 3, 1, 1, 1, 1, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 5, 5, 5, 1, 1, 1, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1]
+      };
+    }
+    GameServer.prototype.addPlayer = function(player) {
+      var tank;
+      tank = this.game.createTank(player.name);
+      player.setTank(tank);
+      console.log("Adding '" + player.name + "' to game and sending map data.");
+      this.players.push(player);
+      player.gameServer = this;
+      console.log("There are " + this.players.length + " players in the game.");
+      player.socket.emit('map_data', this.game.map);
+      player.socket.emit('tank_data', this.game.tanks);
+      return this.sendToOthers('add_tank', player.tank, player.name);
     };
-    GameClient.prototype.sendWaypoint = function(x, y) {
-      console.log("Sending waypoint " + x + " " + y);
-      return this.socket.emit('new_waypoint', {
-        x: x,
-        y: y
+    GameServer.prototype.removePlayer = function(player) {
+      console.log("Removed '" + player.name + "' from server.");
+      return this.players.splice(this.players.indexOf(player, 1));
+    };
+    GameServer.prototype.sendToPlayers = function(type, data) {
+      var player, _i, _len, _ref, _results;
+      _ref = this.players;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        player = _ref[_i];
+        _results.push(player.socket.emit(type, data));
+      }
+      return _results;
+    };
+    GameServer.prototype.sendToOthers = function(type, data, excludeName) {
+      var player, _i, _len, _ref, _results;
+      _ref = this.players;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        player = _ref[_i];
+        if (player.name !== excludeName) {
+          _results.push(player.socket.emit(type, data));
+        }
+      }
+      return _results;
+    };
+    return GameServer;
+  })();
+  Player = (function() {
+    function Player(socket, server) {
+      this.socket = socket;
+      this.server = server;
+      this.newWaypoint = __bind(this.newWaypoint, this);
+      this.score = 0;
+      this.socket.on('set_name', __bind(function(name) {
+        this.name = name;
+        this.socket.emit('name_set');
+        return this.server.joinServer(this);
+      }, this));
+      this.socket.on('join_game', __bind(function() {
+        return this.server.joinGame(this);
+      }, this));
+      this.socket.on('new_waypoint', this.newWaypoint);
+    }
+    Player.prototype.setTank = function(tank) {
+      this.tank = tank;
+    };
+    Player.prototype.newWaypoint = function(data) {
+      var p;
+      p = new Vector(data.x, data.y);
+      this.tank.addWaypoint(p);
+      return this.gameServer.sendToPlayers('new_waypoint', {
+        name: this.tank.name,
+        waypoint: p
       });
     };
-    GameClient.prototype.receiveWaypoint = function(data) {
-      var tank;
-      console.log("Received waypoint for " + data.name);
-      tank = this.game.findTankByName(data.name);
-      return tank.addWaypoint(data.waypoint);
-    };
-    return GameClient;
+    return Player;
   })();
-  GameController = (function() {
-    function GameController(client) {
-      this.client = client;
-      this.onClick = __bind(this.onClick, this);
-      this.onTick = __bind(this.onTick, this);
-      $(this.client.canvas).click(this.onClick);
-      setInterval(this.onTick, 1000 / 60);
-    }
-    GameController.prototype.onTick = function(event) {
-      return this.client.game.tick();
-    };
-    GameController.prototype.onClick = function(e) {
-      var x, y;
-      x = 0;
-      y = 0;
-      if (e.pageX || e.pageY) {
-        x = e.pageX;
-        y = e.pageY;
-      } else {
-        x = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
-        y = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
-      }
-      x -= this.client.canvas[0].offsetLeft;
-      y -= this.client.canvas[0].offsetTop;
-      return this.client.sendWaypoint(x, y);
-    };
-    return GameController;
-  })();
-  GameView = (function() {
-    function GameView(canvas, game) {
-      this.canvas = canvas;
-      this.game = game;
-      this.drawTanks = __bind(this.drawTanks, this);
-      this.drawMap = __bind(this.drawMap, this);
-      this.render = __bind(this.render, this);
-      this.ctx = this.canvas[0].getContext("2d");
-      this.game.mapLoaded.add(this.render);
-      this.game.tanksLoaded.add(this.render);
-      this.game.gameUpdated.add(this.render);
-    }
-    GameView.prototype.render = function() {
-      $(this.canvas).attr('width', $(this.canvas).attr('width'));
-      this.drawMap(this.game.map);
-      return this.drawTanks(this.game.tanks);
-    };
-    GameView.prototype.drawMap = function(map) {
-      var i, j, tileType, x, y, _ref, _results;
-      $(this.canvas).attr('width', this.game.tileSize * map.xSize + "px");
-      $(this.canvas).attr('height', this.game.tileSize * map.ySize + "px");
-      _results = [];
-      for (i = 0, _ref = map.ySize - 1; 0 <= _ref ? i <= _ref : i >= _ref; 0 <= _ref ? i++ : i--) {
-        _results.push((function() {
-          var _ref2, _results2;
-          _results2 = [];
-          for (j = 0, _ref2 = map.xSize - 1; 0 <= _ref2 ? j <= _ref2 : j >= _ref2; 0 <= _ref2 ? j++ : j--) {
-            y = this.game.tileSize * i;
-            x = this.game.tileSize * j;
-            tileType = map.tiles[i * map.xSize + j];
-            _results2.push(tileType === 1 ? (this.ctx.fillStyle = "#000000", this.ctx.fillRect(x, y, this.game.tileSize, this.game.tileSize)) : void 0);
-          }
-          return _results2;
-        }).call(this));
-      }
-      return _results;
-    };
-    GameView.prototype.drawTanks = function(tanks) {
-      var tank, _i, _len, _results;
-      _results = [];
-      for (_i = 0, _len = tanks.length; _i < _len; _i++) {
-        tank = tanks[_i];
-        this.ctx.fillStyle = "#FF0000";
-        this.ctx.fillRect(tank.position.x, tank.position.y, 15, 15);
-        _results.push(this.ctx.fillText(tank.name, tank.position.x, tank.position.y + 25));
-      }
-      return _results;
-    };
-    return GameView;
-  })();
-  $(document).ready(function() {
-    var client;
-    client = new GameClient($("#game_canvas"));
-    return $("#connect").click(function() {
-      if ($("#connect").text() === 'Connect') {
-        client.connect($("#username").val());
-        return $("#connect").text('Disconnect');
-      } else {
-        client.disconnect();
-        return location.reload();
-      }
-    });
-  });
   Vector = (function() {
     function Vector(x, y) {
       this.x = x;
@@ -210,7 +168,7 @@
       this.findTankByName = __bind(this.findTankByName, this);
       this.createTank = __bind(this.createTank, this);
       this.mapHeight = __bind(this.mapHeight, this);
-      this.mapWidth = __bind(this.mapWidth, this);      this.tileSize = 40;
+      this.mapWidth = __bind(this.mapWidth, this);      this.tileSize = 30;
       this.tanks = [];
       this.map = {};
       this.mapLoaded = new Signal;

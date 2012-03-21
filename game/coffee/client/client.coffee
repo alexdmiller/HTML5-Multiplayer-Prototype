@@ -73,11 +73,15 @@ class GameView
     @game.mapLoaded.add @render
     @game.tanksLoaded.add @render
     @game.gameUpdated.add @render
-  
+    
+    @loadImages ['dirt.png', 'grass.png', 'metal_barricade.png'
+                 'rubber.png', 'water.png', 'wood_barricade.png',
+                 'wood_crate.png', 'wood_tile.png']
+      
   render: =>
     $(@canvas).attr 'width', $(@canvas).attr 'width'
-    @drawMap(@game.map)
-    @drawTanks(@game.tanks)
+    @drawMap @game.map
+    @drawTanks @game.tanks
 
   drawMap: (map) =>
     $(@canvas).attr 'width', @game.tileSize * map.xSize + "px"
@@ -87,15 +91,23 @@ class GameView
         y = @game.tileSize * i
         x = @game.tileSize * j
         tileType = map.tiles[i * map.xSize + j]
-        if tileType is 1
-          @ctx.fillStyle = "#000000"
-          @ctx.fillRect x, y, @game.tileSize, @game.tileSize
+        @ctx.drawImage @images[tileType], x, y, @game.tileSize, @game.tileSize
+  
+  loadImages: (images) ->
+    @images = []
+    for path in images
+      img = new Image
+      img.src = "images/" + path
+      @images.push img      
 
   drawTanks: (tanks) =>
     for tank in tanks
-      @ctx.fillStyle = "#FF0000"
+      @ctx.fillStyle = "#FFFFFF"
       @ctx.fillRect tank.position.x, tank.position.y, 15, 15
-      @ctx.fillText tank.name, tank.position.x, tank.position.y + 25
+      @ctx.font = "11pt Arial";
+      @ctx.fillText tank.name, tank.position.x, tank.position.y + 30
+      @ctx.fillStyle = "#000000"
+      @ctx.strokeRect tank.position.x, tank.position.y, 15, 15
       
 $(document).ready ->  
   client = new GameClient $("#game_canvas")
