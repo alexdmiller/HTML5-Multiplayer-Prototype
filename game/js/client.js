@@ -50,6 +50,9 @@
         console.log("Received tank data.");
         return this.game.loadTanks(tanks);
       }, this));
+      this.socket.on('add_tank', __bind(function(data) {
+        return this.game.addTank(new Tank(data));
+      }, this));
       return this.socket.on('new_waypoint', this.receiveWaypoint);
     };
     GameClient.prototype.sendWaypoint = function(x, y) {
@@ -229,12 +232,13 @@
       this.tanks = [];
       for (_i = 0, _len = tanks.length; _i < _len; _i++) {
         tankData = tanks[_i];
-        this.tanks.push(new Tank(tankData));
+        this.addTank(tankData);
       }
       return this.tanksLoaded.dispatch(this.tanks);
     };
-    Game.prototype.addTank = function(tank) {
-      return this.tanks.push(tank);
+    Game.prototype.addTank = function(tankData) {
+      this.tanks.push(new Tank(tankData));
+      return this.tanksLoaded.dispatch(this.tanks);
     };
     Game.prototype.createTank = function(name) {
       var tank;

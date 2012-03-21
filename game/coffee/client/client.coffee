@@ -33,6 +33,8 @@ class GameClient
     @socket.on 'tank_data', (tanks) =>
       console.log "Received tank data."
       @game.loadTanks tanks
+    @socket.on 'add_tank', (data) =>
+      @game.addTank new Tank data
     @socket.on 'new_waypoint', @receiveWaypoint
   
   sendWaypoint: (x, y) =>

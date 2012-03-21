@@ -51,6 +51,7 @@ class GameServer
     console.log "There are #{@players.length} players in the game."
     player.socket.emit 'map_data', @game.map
     player.socket.emit 'tank_data', @game.tanks
+    @sendToOthers 'add_tank', player.tank, player.name
   
   removePlayer: (player) ->
     # TODO: remove player's tank from game
@@ -59,7 +60,10 @@ class GameServer
   
   sendToPlayers: (type, data) ->
     player.socket.emit type, data for player in @players
-
+  
+  sendToOthers: (type, data, excludeName) ->
+    player.socket.emit type, data for player in @players when player.name != excludeName
+    
 class Player
   constructor: (@socket, @server) ->
     @score = 0

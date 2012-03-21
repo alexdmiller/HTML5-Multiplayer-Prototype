@@ -58,7 +58,8 @@
       player.gameServer = this;
       console.log("There are " + this.players.length + " players in the game.");
       player.socket.emit('map_data', this.game.map);
-      return player.socket.emit('tank_data', this.game.tanks);
+      player.socket.emit('tank_data', this.game.tanks);
+      return this.sendToOthers('add_tank', player.tank, player.name);
     };
     GameServer.prototype.removePlayer = function(player) {
       console.log("Removed '" + player.name + "' from server.");
@@ -71,6 +72,18 @@
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         player = _ref[_i];
         _results.push(player.socket.emit(type, data));
+      }
+      return _results;
+    };
+    GameServer.prototype.sendToOthers = function(type, data, excludeName) {
+      var player, _i, _len, _ref, _results;
+      _ref = this.players;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        player = _ref[_i];
+        if (player.name !== excludeName) {
+          _results.push(player.socket.emit(type, data));
+        }
       }
       return _results;
     };
@@ -177,12 +190,13 @@
       this.tanks = [];
       for (_i = 0, _len = tanks.length; _i < _len; _i++) {
         tankData = tanks[_i];
-        this.tanks.push(new Tank(tankData));
+        this.addTank(tankData);
       }
       return this.tanksLoaded.dispatch(this.tanks);
     };
-    Game.prototype.addTank = function(tank) {
-      return this.tanks.push(tank);
+    Game.prototype.addTank = function(tankData) {
+      this.tanks.push(new Tank(tankData));
+      return this.tanksLoaded.dispatch(this.tanks);
     };
     Game.prototype.createTank = function(name) {
       var tank;

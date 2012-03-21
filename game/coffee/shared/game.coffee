@@ -19,12 +19,12 @@ class Game
     
   loadTanks: (tanks) ->
     @tanks = []
-    for tankData in tanks
-      @tanks.push new Tank tankData
+    @addTank tankData for tankData in tanks
     @tanksLoaded.dispatch @tanks
     
-  addTank: (tank) ->
-    @tanks.push(tank)
+  addTank: (tankData) ->
+    @tanks.push new Tank tankData
+    @tanksLoaded.dispatch @tanks
     
   createTank: (name) =>
     tank = new Tank
